@@ -1,0 +1,117 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;650;700;750;800&display=swap");
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./reach.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: "DM Sans", sans-serif;
+}
+
+:root {
+  --background: #f7f9f8;
+  --foreground: #28342f;
+  --card: #ffffff;
+  --card-foreground: #28342f;
+  --popover: #ffffff;
+  --popover-foreground: #28342f;
+  --primary: #244b3c;
+  --primary-foreground: #ffffff;
+  --secondary: #edf3e8;
+  --secondary-foreground: #31503b;
+  --muted: #edf0ea;
+  --muted-foreground: #75816a;
+  --accent: #f0f5e8;
+  --accent-foreground: #31503b;
+  --destructive: #a4423e;
+  --border: #e6ebe7;
+  --input: #dfe5df;
+  --ring: #87b594;
+  --radius: 0.5rem;
+}
+
+/* Preserve Reach's layout while using the shadcn component primitives. */
+[data-slot="card"].panel {
+  display: block;
+  gap: 0;
+  padding: 0;
+}
+[data-slot="card"].profile-card {
+  display: block;
+  gap: 0;
+}
+[data-slot="dialog-content"].modal {
+  display: block;
+  gap: 0;
+  max-width: none;
+  margin: 0;
+}
+[data-slot="dialog-header"].modal-head {
+  flex-direction: row;
+  text-align: left;
+}
+[data-slot="dialog-overlay"] {
+  background: #12251f65;
+  backdrop-filter: blur(3px);
+}
+.field > [data-slot="native-select-wrapper"] {
+  width: 100%;
+}
+select[data-slot="native-select"] {
+  background-image: none;
+  height: auto;
+}
+input[data-slot="input"] {
+  height: auto;
+}
+.search-input input[data-slot="input"] {
+  height: 35px;
+  box-shadow: none;
+  padding: 0;
+}
+.nav-item[data-slot="button"] {
+  justify-content: flex-start;
+  height: auto;
+}
+.icon-button[data-slot="button"] {
+  width: 28px;
+  height: 28px;
+}
+.person-cell[data-slot="button"] {
+  height: auto;
+}
+.followup-item[data-slot="button"],
+.meeting-card[data-slot="button"],
+.board-card[data-slot="button"] {
+  height: auto;
+}
+.board-card[data-slot="button"] {
+  display: block;
+  white-space: normal;
+}
+.page-footer button[data-slot="button"] {
+  height: auto;
+}

@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "reach": {
+      "type": "http",
+      "url": "http://localhost:5173/api/mcp",
+      "headers": { "Authorization": "Bearer ${CRM_API_TOKEN}" },
+      "tools": ["*"]
+    }
+  }
+}
