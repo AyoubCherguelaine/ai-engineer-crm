@@ -10,7 +10,8 @@
     "test": "node --conditions=react-server --test tests/*.test.mjs",
     "mcp:check": "node --env-file=.env scripts/mcp-check.mjs",
     "db:check": "node --conditions=react-server --env-file=.env scripts/db-check.mjs",
-    "db:migrate:turso": "node --conditions=react-server --env-file=.env scripts/migrate-turso.mjs"
+    "db:migrate:turso": "node --conditions=react-server --env-file=.env scripts/migrate-turso.mjs",
+    "db:remove-seed": "node --conditions=react-server --env-file=.env scripts/remove-seed-data.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",

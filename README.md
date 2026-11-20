@@ -126,6 +126,8 @@ The app uses `GET /api/workspace` for the full `{data, revision, initialized}` s
 
 ## Storage, migration, and backups
 
+New workspaces start with no contacts or companies. Historical demo records are removed from legacy browser data and imported backups, while personal records and profile details are preserved. To clean an older database explicitly, use `npm run db:remove-seed` for the configured database or `npm run db:remove-seed -- --local` for the local SQLite file. The cleanup backs up the workspace before changing it and matches only the known demo ID/name pairs.
+
 The UI, API, and MCP share one workspace: a remote Turso database when configured, or the existing local SQLite file for development. A fresh server starts with an empty network. On the first login, a valid previous `reach-crm-v1` browser workspace is migrated automatically **only if the server has not been initialized**. The old browser copy is removed only after the server confirms the import. If the server already has data, the previous browser workspace is retained and can be downloaded from **My profile & resources**. Existing backups without company status/country/LinkedIn fields remain supported; company status defaults to **Not checked**.
 
 Use **Export backup** and **Import backup** in the profile. Restoring a backup replaces the server workspace for every session. CVs remain links rather than uploaded files, and message drafts remain temporary.

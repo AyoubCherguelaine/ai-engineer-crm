@@ -24,7 +24,7 @@ const { createRecord, logContactActivity, updateRecord } =
   await import("../src/server/crm-service.js");
 const { readLocalWorkspace, importIntoEmptyDatabase } =
   await import("../src/server/workspace-migration.js");
-const { seed } = await import("../src/lib/crm-data.js");
+const { workspaceFixture } = await import("./helpers/workspace-fixture.mjs");
 let fixture;
 after(async () => {
   await closeDatabases();
@@ -123,7 +123,7 @@ test("concurrent snapshot mutations and activity appends preserve all accepted c
 test("old SQLite workspace migrates without changing its source and refuses a populated destination", async () => {
   const sourcePath = join(directory, "legacy.sqlite");
   const source = createClient({ url: pathToFileURL(sourcePath).href });
-  const data = structuredClone(seed);
+  const data = workspaceFixture();
   data.companies.forEach((c) => {
     delete c.status;
     delete c.country;

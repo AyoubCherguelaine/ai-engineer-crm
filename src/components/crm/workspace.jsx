@@ -293,15 +293,6 @@ function App() {
             >
               <LogOut size={17} />
             </Button>
-            {data.demo && (
-              <Button
-                variant="ghost"
-                className="demo-label"
-                onClick={() => setModal({ type: "clear" })}
-              >
-                Demo workspace
-              </Button>
-            )}
             <span className="local-indicator">
               <span />
               {saveError ? "Not saved" : saving ? "Saving…" : "Saved to server"}
@@ -973,7 +964,6 @@ function App() {
                 onExport={exportData}
                 onImport={() => importRef.current.click()}
                 onClear={() => setModal({ type: "clear" })}
-                demo={data.demo}
               />
             </>
           )}
@@ -982,16 +972,7 @@ function App() {
               <Sprout size={14} />A little more intentional. A lot more
               possible.
             </span>
-            {data.demo ? (
-              <Button
-                variant="ghost"
-                onClick={() => setModal({ type: "clear" })}
-              >
-                Demo data · Start fresh <ChevronRight size={13} />
-              </Button>
-            ) : (
-              <span>Your network, your pace.</span>
-            )}
+            <span>Your network, your pace.</span>
           </footer>
         </div>
       </main>
@@ -1066,9 +1047,7 @@ function App() {
           <div className="confirm-body">
             <p>
               {modal.type === "clear"
-                ? data.demo
-                  ? "Remove the example contacts and companies, and start with your own network. Your profile will be kept."
-                  : "This removes all contacts and companies from the server. Your profile will be kept. Export a backup first if you want to keep them."
+                ? "This removes all contacts and companies from the server. Your profile will be kept. Export a backup first if you want to keep them."
                 : modal.type === "import"
                   ? "This will replace your current contacts, companies, and profile. Export a backup first if you need a copy."
                   : modal.type === "deleteCompany"

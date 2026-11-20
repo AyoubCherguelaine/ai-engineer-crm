@@ -20,7 +20,7 @@ import {
 import { Field } from "./shared";
 export { Profile };
 
-function Profile({ profile, onSave, onExport, onImport, onClear, demo }) {
+function Profile({ profile, onSave, onExport, onImport, onClear }) {
   const [form, setForm] = useState(profile);
   return (
     <>
@@ -140,13 +140,10 @@ function Profile({ profile, onSave, onExport, onImport, onClear, demo }) {
               Import backup
             </Button>
             <hr />
-            <h3>
-              {demo ? "Ready to make it yours?" : "Start with a clean slate"}
-            </h3>
+            <h3>Start with a clean slate</h3>
             <p>
-              {demo
-                ? "The current records are examples. Clear them when you’re ready to add real connections."
-                : "Remove your contacts and companies. Export a backup first if you want to keep them."}
+              Remove your contacts and companies. Export a backup first if you
+              want to keep them.
             </p>
             <Button
               variant="ghost"
@@ -154,7 +151,7 @@ function Profile({ profile, onSave, onExport, onImport, onClear, demo }) {
               onClick={onClear}
             >
               <Trash2 size={15} />
-              {demo ? "Clear demo data" : "Clear workspace"}
+              Clear workspace
             </Button>
           </div>
         </Card>

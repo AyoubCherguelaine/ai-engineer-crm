@@ -32,7 +32,7 @@ const { readWorkspace, mutateWorkspace, database, closeDatabases } =
   await import("../src/server/database.js");
 const { normalizeWorkspace } = await import("../src/server/validation.js");
 const { readJson, expectedRevision } = await import("../src/server/http.js");
-const { seed } = await import("../src/lib/crm-data.js");
+const { workspaceFixture } = await import("./helpers/workspace-fixture.mjs");
 const auth =
   "Basic " +
   Buffer.from(
@@ -332,7 +332,7 @@ test("stale workspace revisions cannot overwrite API updates", async () => {
   );
 });
 test("old backups normalize company status without losing records", () => {
-  const old = structuredClone(seed);
+  const old = workspaceFixture();
   old.companies.forEach((c) => {
     delete c.status;
     delete c.country;

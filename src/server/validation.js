@@ -1,5 +1,6 @@
+import { removeLegacySeedRecords } from "../lib/legacy-seed-cleanup.js";
 import { z } from "zod";
-import { statuses, seed } from "../lib/crm-data.js";
+import { statuses, defaultProfile } from "../lib/crm-data.js";
 import { ApiError } from "./errors.js";
 
 const text = z.string().max(20000);
@@ -164,7 +165,8 @@ export function parse(schema, value) {
     );
   return result.data;
 }
-export function normalizeWorkspace(value) {
+export function normalizeWorkspace(input) {
+  const value = removeLegacySeedRecords(input);
   if (
     !value ||
     !Array.isArray(value.companies) ||
@@ -196,7 +198,7 @@ export function normalizeWorkspace(value) {
 }
 export function emptyWorkspace() {
   return {
-    profile: structuredClone(seed.profile),
+    profile: structuredClone(defaultProfile),
     contacts: [],
     companies: [],
     demo: false,
