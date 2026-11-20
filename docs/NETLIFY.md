@@ -100,7 +100,24 @@ Set these variables in Netlify's project environment settings for the production
 
 Make the variables available to the **Functions runtime**, and to builds as appropriate for your Netlify settings. Local `.env` is ignored by Git and is not automatically uploaded. Variables declared only in `netlify.toml` are not runtime function secrets; use the Netlify UI, CLI, or API. [Netlify's environment-variable documentation](https://docs.netlify.com/build/functions/environment-variables/)
 
+### Mark sensitive variables as secrets
+
+In Netlify, open **Project configuration → Environment variables**. For each of the following variables, select **Options → Edit**, enable **Contains secret values**, and save:
+
+- `CRM_PASSWORD`
+- `SESSION_SECRET`
+- `CRM_API_TOKEN`
+- `TURSO_AUTH_TOKEN`
+
+Use the **Production** deploy context and ensure the variables are available to the **Functions** runtime. If importing `.env` in the UI, import first, then edit these four variables to enable the secret flag. This is a Netlify account setting; naming a variable in `.env` or `netlify.toml` does not set it. Once flagged, secret values become write-only for protected contexts. [Netlify Secrets Controller](https://docs.netlify.com/build/environment-variables/secrets-controller/)
+
 `CRM_DB_PATH` is not used in Turso mode. The app also detects Netlify/AWS function environments and refuses local fallback if Turso credentials are absent. A `503` configuration error is preferable to losing records in a temporary filesystem.
+
+### Build reports `CRM_USERNAME` or `CRM_DB_PATH` as exposed
+
+These are non-secret configuration values: a login identifier and the local SQLite path. Their values can legitimately occur in repository examples and fallback settings. The included `netlify.toml` sets `SECRETS_SCAN_OMIT_KEYS=CRM_USERNAME,CRM_DB_PATH` to exclude only those keys from value scanning. Passwords, session secrets, MCP keys, and Turso tokens remain scanned. Do not add those credentials to this exception or disable secret scanning. [Netlify scanning configuration](https://docs.netlify.com/build/environment-variables/secrets-controller/)
+
+Push the configuration change and redeploy. `CRM_DB_PATH` can also be removed from Netlify's environment settings because Turso mode does not use it. The four sensitive variables listed above should remain marked **Contains secret values**.
 
 Use production-scoped credentials for production. For deploy previews, configure a separate Turso database if you want a working preview. Otherwise leave its database credentials unset; the data endpoints will report `503` rather than create local storage. Sharing production credentials with a preview makes the preview read and write production records.
 
