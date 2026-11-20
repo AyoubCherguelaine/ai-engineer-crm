@@ -10,16 +10,16 @@ import { route, json, readJson, expectedRevision } from "./http.js";
 
 export function recordRoutes(kind) {
   return {
-    list: route((request) => {
+    list: route(async (request) => {
       const params = new URL(request.url).searchParams;
-      const result = listRecords(kind, {
+      const result = await listRecords(kind, {
         q: params.get("q") || "",
         status: params.get("status"),
       });
       return json(result, 200, { ETag: `"${result.revision}"` });
     }),
     create: route(async (request) => {
-      const result = createRecord(
+      const result = await createRecord(
         kind,
         await readJson(request),
         expectedRevision(request),
@@ -31,12 +31,12 @@ export function recordRoutes(kind) {
     }),
     get: route(async (request, context) => {
       const { id } = await context.params;
-      const result = getRecord(kind, id);
+      const result = await getRecord(kind, id);
       return json(result, 200, { ETag: `"${result.revision}"` });
     }),
     update: route(async (request, context) => {
       const { id } = await context.params;
-      const result = updateRecord(
+      const result = await updateRecord(
         kind,
         id,
         await readJson(request),
@@ -46,7 +46,7 @@ export function recordRoutes(kind) {
     }),
     remove: route(async (request, context) => {
       const { id } = await context.params;
-      return json(deleteRecord(kind, id, expectedRevision(request)));
+      return json(await deleteRecord(kind, id, expectedRevision(request)));
     }),
   };
 }

@@ -8,11 +8,13 @@
     "build": "next build",
     "start": "next start --hostname 0.0.0.0 --port 5173",
     "test": "node --conditions=react-server --test tests/*.test.mjs",
-    "mcp:check": "node --env-file=.env scripts/mcp-check.mjs"
+    "mcp:check": "node --env-file=.env scripts/mcp-check.mjs",
+    "db:check": "node --conditions=react-server --env-file=.env scripts/db-check.mjs",
+    "db:migrate:turso": "node --conditions=react-server --env-file=.env scripts/migrate-turso.mjs"
   },
   "dependencies": {
+    "@libsql/client": "^0.18.0",
     "@modelcontextprotocol/sdk": "^1.32.2",
-    "better-sqlite3": "^13.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.468.0",

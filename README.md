@@ -4,7 +4,7 @@ A Next.js CRM for Ayoub’s part-time and collaboration search. Track contacts, 
 
 ## Run locally
 
-Requires **Node.js 22+** and a writable local disk.
+Requires **Node.js 22+**. Local SQLite development needs a writable disk; Netlify deployments use Turso.
 
 ```sh
 npm install
@@ -15,13 +15,16 @@ Open http://localhost:5173 and sign in with `CRM_USERNAME` and `CRM_PASSWORD` fr
 
 For a fresh checkout, copy `.env.example` to `.env` and fill in:
 
-| Variable         | Purpose                                                                               |
-| ---------------- | ------------------------------------------------------------------------------------- |
-| `CRM_USERNAME`   | The single user's login name; also used for API authentication.                       |
-| `CRM_PASSWORD`   | Login/API password.                                                                   |
-| `SESSION_SECRET` | At least 32 random characters to sign sessions. Generate with `openssl rand -hex 32`. |
-| `CRM_API_TOKEN`  | Dedicated MCP/REST bearer key; use at least 32 random characters.                     |
-| `CRM_DB_PATH`    | SQLite file location, default `data/reach.sqlite`.                                    |
+| Variable             | Purpose                                                                               |
+| -------------------- | ------------------------------------------------------------------------------------- |
+| `CRM_USERNAME`       | The single user's login name; also used for API authentication.                       |
+| `CRM_PASSWORD`       | Login/API password.                                                                   |
+| `SESSION_SECRET`     | At least 32 random characters to sign sessions. Generate with `openssl rand -hex 32`. |
+| `CRM_API_TOKEN`      | Dedicated MCP/REST bearer key; use at least 32 random characters.                     |
+| `CRM_DB_PATH`        | Local SQLite file location, default `data/reach.sqlite`. Ignored in Turso mode.       |
+| `TURSO_DATABASE_URL` | Remote Turso libSQL URL; leave empty with the token for local development.            |
+| `TURSO_AUTH_TOKEN`   | Private read/write database token; required with the remote URL.                      |
+| `CRM_REQUIRE_TURSO`  | Set `true` on Netlify to prevent temporary local storage.                             |
 
 ```sh
 npm run build
@@ -29,6 +32,18 @@ npm start
 ```
 
 Sessions last eight hours. Signing out clears the browser session; changing the username, password, or session secret invalidates existing sessions. Login attempts are limited to ten failures per fifteen minutes per server process. Use HTTPS when hosting this app beyond localhost, including when sending API credentials.
+
+## Netlify deployment
+
+Use **Turso for persistent database storage**. [docs/NETLIFY.md](docs/NETLIFY.md) covers database creation, environment variables, safe migration of existing records, and deployment checks. `netlify.toml` supplies the build settings.
+
+```sh
+# After setting TURSO_DATABASE_URL and TURSO_AUTH_TOKEN in .env:
+npm run db:migrate:turso
+npm run db:check
+```
+
+The migration saves a backup and refuses to overwrite an initialized destination. No cloud database is created or connected until you provide its credentials.
 
 ## Your workflow
 
@@ -111,11 +126,11 @@ The app uses `GET /api/workspace` for the full `{data, revision, initialized}` s
 
 ## Storage, migration, and backups
 
-The UI and API share one durable SQLite file. A fresh server starts with an empty network. On the first login, a valid previous `reach-crm-v1` browser workspace is migrated automatically **only if the server has not been initialized**. The old browser copy is removed only after the server confirms the import. If the server already has data, the previous browser workspace is retained and can be downloaded from **My profile & resources**. Existing backups without company status/country/LinkedIn fields remain supported; company status defaults to **Not checked**.
+The UI, API, and MCP share one workspace: a remote Turso database when configured, or the existing local SQLite file for development. A fresh server starts with an empty network. On the first login, a valid previous `reach-crm-v1` browser workspace is migrated automatically **only if the server has not been initialized**. The old browser copy is removed only after the server confirms the import. If the server already has data, the previous browser workspace is retained and can be downloaded from **My profile & resources**. Existing backups without company status/country/LinkedIn fields remain supported; company status defaults to **Not checked**.
 
 Use **Export backup** and **Import backup** in the profile. Restoring a backup replaces the server workspace for every session. CVs remain links rather than uploaded files, and message drafts remain temporary.
 
-This is a single-server, single-user app. Host it with persistent local storage, or mount `data/` as a persistent volume. Ephemeral/serverless filesystems and multiple independent replicas do not share the SQLite file. To back up the raw database while running, use SQLite's online backup mechanism; to copy it as a file, stop the app first. JSON export works while running.
+This is a single-user app. Netlify/function deployments must configure Turso; missing remote credentials produce `503` instead of silently using a temporary file. A conventional single server can still use local SQLite with persistent disk. See [the deployment guide](docs/NETLIFY.md). To back up the raw database while running, use SQLite's online backup mechanism; to copy it as a file, stop the app first. JSON export works while running.
 
 ## Structure and checks
 
@@ -123,7 +138,7 @@ This is a single-server, single-user app. Host it with persistent local storage,
 - `src/components/crm/`: workspace, forms, activity details, profile, and templates.
 - `src/components/ui/`: shadcn/ui primitives.
 - `src/hooks/use-workspace-storage.js`: server loading, legacy migration, and serialized revision-checked saves.
-- `src/server/`: authentication, SQLite persistence, validation, shared CRM services, REST handlers, and MCP tools.
+- `src/server/`: authentication, asynchronous Turso/local SQLite persistence, validation, shared CRM services, REST handlers, and MCP tools.
 - `src/lib/crm-data.js`: record helpers, statuses, and legacy backup compatibility.
 - `tests/server.test.mjs`: authentication, validation, CRUD, atomicity, persistence, and conflict checks using a temporary database.
 
@@ -132,4 +147,4 @@ npm test
 npm run build
 ```
 
-Stack: Next.js App Router, React 19, shadcn/ui, Tailwind CSS 4, SQLite, Zod, Sonner, and Lucide.
+Stack: Next.js App Router, React 19, shadcn/ui, Tailwind CSS 4, Turso/libSQL or local SQLite, Zod, Sonner, and Lucide.

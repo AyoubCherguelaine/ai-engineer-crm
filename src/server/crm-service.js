@@ -19,11 +19,11 @@ function find(data, kind, id) {
   if (!record) throw new ApiError(404, "Record not found.");
   return record;
 }
-export function listRecords(
+export async function listRecords(
   kind,
   { q = "", status, companyId, country, limit, offset = 0 } = {},
 ) {
-  const { data, revision } = readWorkspace();
+  const { data, revision } = await readWorkspace();
   const query = q.toLowerCase();
   const matches = data[kind].filter(
     (record) =>
@@ -53,11 +53,11 @@ export function listRecords(
     revision,
   };
 }
-export function getRecord(kind, id) {
-  const { data, revision } = readWorkspace();
+export async function getRecord(kind, id) {
+  const { data, revision } = await readWorkspace();
   return { data: find(data, kind, id), revision };
 }
-export function createRecord(kind, value, expectedRevision) {
+export async function createRecord(kind, value, expectedRevision) {
   const input = parse(
     kind === "contacts" ? contactCreate : companyCreate,
     value,
@@ -68,7 +68,7 @@ export function createRecord(kind, value, expectedRevision) {
     ...input,
     id: input.id || randomUUID(),
   };
-  const result = mutateWorkspace((data) => {
+  const result = await mutateWorkspace((data) => {
     if (data[kind].some((r) => r.id === record.id))
       throw new ApiError(409, "A record with this ID already exists.");
     data[kind].unshift(record);
@@ -76,18 +76,18 @@ export function createRecord(kind, value, expectedRevision) {
   }, expectedRevision);
   return { data: record, revision: result.revision };
 }
-export function updateRecord(kind, id, value, expectedRevision) {
+export async function updateRecord(kind, id, value, expectedRevision) {
   const patch = parse(kind === "contacts" ? contactPatch : companyPatch, value);
   let record;
-  const result = mutateWorkspace((data) => {
+  const result = await mutateWorkspace((data) => {
     record = { ...find(data, kind, id), ...patch };
     data[kind] = data[kind].map((r) => (r.id === id ? record : r));
     return data;
   }, expectedRevision);
   return { data: record, revision: result.revision };
 }
-export function deleteRecord(kind, id, expectedRevision) {
-  const result = mutateWorkspace((data) => {
+export async function deleteRecord(kind, id, expectedRevision) {
+  const result = await mutateWorkspace((data) => {
     find(data, kind, id);
     data[kind] = data[kind].filter((r) => r.id !== id);
     if (kind === "companies")
@@ -98,10 +98,10 @@ export function deleteRecord(kind, id, expectedRevision) {
   }, expectedRevision);
   return { deleted: true, revision: result.revision };
 }
-export function logContactActivity(id, value, expectedRevision) {
+export async function logContactActivity(id, value, expectedRevision) {
   const activity = parse(activityLog, value);
   let record;
-  const result = mutateWorkspace((data) => {
+  const result = await mutateWorkspace((data) => {
     record = addContactActivity(find(data, "contacts", id), activity);
     data.contacts = data.contacts.map((c) => (c.id === id ? record : c));
     return data;

@@ -5,6 +5,15 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 const directory = mkdtempSync(join(tmpdir(), "reach-server-test-"));
+// Never use developer or deployment cloud credentials in automated tests.
+for (const key of [
+  "TURSO_DATABASE_URL",
+  "TURSO_AUTH_TOKEN",
+  "CRM_REQUIRE_TURSO",
+  "NETLIFY",
+  "AWS_LAMBDA_FUNCTION_NAME",
+])
+  delete process.env[key];
 process.env.CRM_DB_PATH = join(directory, "test.sqlite");
 process.env.CRM_USERNAME = "test-user";
 process.env.CRM_PASSWORD = "test-password-for-unit-tests";
@@ -19,7 +28,7 @@ const {
   SESSION_SECONDS,
 } = await import("../src/server/auth.js");
 const { recordRoutes } = await import("../src/server/records.js");
-const { readWorkspace, mutateWorkspace, database } =
+const { readWorkspace, mutateWorkspace, database, closeDatabases } =
   await import("../src/server/database.js");
 const { normalizeWorkspace } = await import("../src/server/validation.js");
 const { readJson, expectedRevision } = await import("../src/server/http.js");
@@ -43,12 +52,8 @@ function request(path, method = "GET", body, extra = {}) {
 const companies = recordRoutes("companies"),
   contacts = recordRoutes("contacts");
 const context = (id) => ({ params: Promise.resolve({ id }) });
-after(() => {
-  for (const [path, db] of globalThis.__reachDatabases ?? [])
-    if (path === process.env.CRM_DB_PATH) {
-      db.close();
-      globalThis.__reachDatabases.delete(path);
-    }
+after(async () => {
+  await closeDatabases();
   rmSync(directory, { recursive: true, force: true });
 });
 
@@ -247,7 +252,7 @@ test("create, read, filter, and patch companies and contacts using minimal JSON"
   );
 });
 test("validation and conflicting identifiers roll back atomically", async () => {
-  const before = readWorkspace().revision;
+  const before = (await readWorkspace()).revision;
   assert.equal(
     (
       await companies.create(
@@ -305,20 +310,20 @@ test("validation and conflicting identifiers roll back atomically", async () => 
     ).status,
     422,
   );
-  assert.equal(readWorkspace().revision, before);
+  assert.equal((await readWorkspace()).revision, before);
 });
 test("stale workspace revisions cannot overwrite API updates", async () => {
-  const stale = readWorkspace();
+  const stale = await readWorkspace();
   await contacts.update(
     request("/api/contacts/sarah", "PATCH", { notes: "Added through API" }),
     context("sarah"),
   );
-  assert.throws(
+  await assert.rejects(
     () => mutateWorkspace(() => stale.data, stale.revision),
     (error) => error.status === 409,
   );
   assert.equal(
-    readWorkspace().data.contacts.find((c) => c.id === "sarah").notes,
+    (await readWorkspace()).data.contacts.find((c) => c.id === "sarah").notes,
     "Added through API",
   );
   assert.throws(
@@ -337,11 +342,10 @@ test("old backups normalize company status without losing records", () => {
   assert.equal(normalized.companies[0].status, "Not checked");
   assert.equal(normalized.contacts.length, old.contacts.length);
 });
-test("database records survive reopening the SQLite connection", () => {
-  const before = readWorkspace();
-  database().close();
-  globalThis.__reachDatabases.delete(process.env.CRM_DB_PATH);
-  assert.deepEqual(readWorkspace(), before);
+test("database records survive reopening the SQLite connection", async () => {
+  const before = await readWorkspace();
+  await closeDatabases();
+  assert.deepEqual(await readWorkspace(), before);
 });
 test("company deletion keeps contacts and clears their company link", async () => {
   assert.equal(
@@ -354,7 +358,8 @@ test("company deletion keeps contacts and clears their company link", async () =
     200,
   );
   assert.equal(
-    readWorkspace().data.contacts.find((c) => c.id === "sarah").companyId,
+    (await readWorkspace()).data.contacts.find((c) => c.id === "sarah")
+      .companyId,
     "",
   );
 });

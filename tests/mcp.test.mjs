@@ -7,12 +7,22 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
 const directory = mkdtempSync(join(tmpdir(), "reach-mcp-test-"));
+// Never use developer or deployment cloud credentials in automated tests.
+for (const key of [
+  "TURSO_DATABASE_URL",
+  "TURSO_AUTH_TOKEN",
+  "CRM_REQUIRE_TURSO",
+  "NETLIFY",
+  "AWS_LAMBDA_FUNCTION_NAME",
+])
+  delete process.env[key];
 process.env.CRM_DB_PATH = join(directory, "crm.sqlite");
 process.env.CRM_API_TOKEN = "mcp-unit-test-token-with-more-than-32-characters";
 const token = process.env.CRM_API_TOKEN;
 const { handleMcpRequest } = await import("../src/server/mcp/http.js");
 const { recordRoutes } = await import("../src/server/records.js");
-const { readWorkspace } = await import("../src/server/database.js");
+const { readWorkspace, closeDatabases } =
+  await import("../src/server/database.js");
 const client = new Client({ name: "reach-mcp-test-client", version: "1.0.0" });
 const transport = new StreamableHTTPClientTransport(
   new URL("http://localhost:5173/api/mcp"),
@@ -23,11 +33,7 @@ const transport = new StreamableHTTPClientTransport(
 );
 after(async () => {
   await client.close();
-  for (const [path, db] of globalThis.__reachDatabases ?? [])
-    if (path === process.env.CRM_DB_PATH) {
-      db.close();
-      globalThis.__reachDatabases.delete(path);
-    }
+  await closeDatabases();
   rmSync(directory, { recursive: true, force: true });
 });
 function request(
@@ -223,7 +229,7 @@ test("MCP updates preserve other fields, detect stale revisions, and append date
   assert.equal(company.data.country, "Algeria");
 });
 test("MCP failures do not mutate data and return useful tool errors", async () => {
-  const before = readWorkspace().revision;
+  const before = (await readWorkspace()).revision;
   const missing = await client.callTool({
     name: "get_contact",
     arguments: { id: "missing" },
@@ -250,7 +256,7 @@ test("MCP failures do not mutate data and return useful tool errors", async () =
   });
   assert.equal(duplicate.isError, true);
   assert.equal(duplicate.structuredContent.error.status, 409);
-  assert.equal(readWorkspace().revision, before);
+  assert.equal((await readWorkspace()).revision, before);
 });
 test("REST uses the same bearer token and sees MCP mutations without browser login credentials", async () => {
   const response = await recordRoutes("contacts").get(

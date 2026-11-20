@@ -126,8 +126,8 @@ export function createCrmMcpServer() {
     "Read the owner’s saved name, skills, bio, portfolio URL, CV link, and desired opportunities.",
     z.object({}).strict(),
     true,
-    () => {
-      const { data, revision } = readWorkspace();
+    async () => {
+      const { data, revision } = await readWorkspace();
       return { data: data.profile, revision };
     },
   );
@@ -137,8 +137,8 @@ export function createCrmMcpServer() {
     "Find contact summaries with pagination. Use get_contact for notes and activity history.",
     z.object({ ...pagination, companyId: recordId.optional() }).strict(),
     true,
-    (input) => {
-      const response = listRecords("contacts", input);
+    async (input) => {
+      const response = await listRecords("contacts", input);
       return {
         ...response,
         data: response.data.map(({ activities, notes, ...summary }) => summary),
@@ -187,8 +187,8 @@ export function createCrmMcpServer() {
       .object({ ...pagination, country: z.string().max(200).optional() })
       .strict(),
     true,
-    (input) => ({
-      ...listRecords("companies", input),
+    async (input) => ({
+      ...(await listRecords("companies", input)),
       offset: input.offset,
       limit: input.limit,
     }),

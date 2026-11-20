@@ -1,0 +1,11 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+  CRM_REQUIRE_TURSO = "true"
+
+# Netlify automatically supplies its current Next.js/OpenNext adapter.
+# Configure TURSO_DATABASE_URL, TURSO_AUTH_TOKEN and the CRM auth secrets
+# in the Netlify UI with Functions runtime access; never put secrets here.
