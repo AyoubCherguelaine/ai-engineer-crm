@@ -62,6 +62,7 @@ import { Templates } from "./message-templates";
 import { useWorkspaceStorage } from "@/hooks/use-workspace-storage";
 import { WorkspaceSkeleton } from "./workspace-skeleton";
 import { toast } from "sonner";
+import { ThemeToggle } from "@/components/theme-toggle";
 const navItems = [
   ["Overview", LayoutDashboard],
   ["Contacts", Users],
@@ -263,6 +264,7 @@ function App() {
             <strong>{page}</strong>
           </div>
           <div className="topbar-right">
+            <ThemeToggle />
             <Button
               variant="ghost"
               className="icon-button"

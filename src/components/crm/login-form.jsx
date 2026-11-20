@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Sprout, LockKeyhole, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Card } from "@/components/ui/card";
 
 export function LoginForm({ configured }) {
@@ -32,6 +33,7 @@ export function LoginForm({ configured }) {
   }
   return (
     <main className="login-shell">
+      <ThemeToggle className="login-theme-toggle" />
       <Card className="login-card">
         <a className="brand" href="/login">
           <span className="brand-icon">

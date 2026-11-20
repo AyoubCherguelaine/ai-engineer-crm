@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 export function WorkspaceSkeleton() {
   return (
     <div
-      className="min-h-screen bg-[#f7f9f8] p-6 md:pl-72"
+      className="min-h-screen bg-background text-foreground p-6 md:pl-72"
       role="status"
       aria-label="Loading your workspace"
     >

@@ -1,0 +1,318 @@
+/* The existing light palette remains the default; dark mode shares shadcn tokens. */
+:root.dark {
+  color-scheme: dark;
+  color: var(--foreground);
+  background: var(--background);
+  --background: #111915;
+  --foreground: #e5ece7;
+  --card: #19231e;
+  --card-foreground: #e5ece7;
+  --popover: #1d2922;
+  --popover-foreground: #e5ece7;
+  --primary: #9bcaa5;
+  --primary-foreground: #13251b;
+  --secondary: #202e25;
+  --secondary-foreground: #d8e6d9;
+  --muted: #29362e;
+  --muted-foreground: #a6b5aa;
+  --accent: #25382b;
+  --accent-foreground: #cce4d1;
+  --destructive: #efaba5;
+  --border: #304035;
+  --input: #3d5143;
+  --ring: #a3c9a8;
+  --green: var(--primary);
+  --lime: #c4e6b0;
+  --reach-muted: var(--muted-foreground);
+  --reach-quiet: #97aa9d;
+}
+.dark body {
+  background: var(--background);
+  color: var(--foreground);
+}
+.theme-toggle {
+  flex-shrink: 0;
+}
+.login-theme-toggle[data-slot="button"] {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 10;
+  width: 38px;
+  height: 38px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  border-radius: 50%;
+}
+.dark .sidebar {
+  background: #151f1a;
+}
+.dark .topbar,
+.dark .panel,
+.dark .stat-card,
+.dark .company-card,
+.dark .board-card,
+.dark .modal,
+.dark .search-input,
+.dark .login-card[data-slot="card"] {
+  background: var(--card);
+  color: var(--foreground);
+}
+.dark .brand-icon {
+  color: var(--primary-foreground);
+}
+.dark .brand-period,
+.dark .little-spark,
+.dark .sidebar-note button,
+.dark .focus-strip button,
+.dark .resource-links a,
+.dark .contact-links a {
+  color: var(--primary);
+}
+.dark .workspace-icon,
+.dark .sidebar-note,
+.dark .focus-strip,
+.dark .view-switch,
+.dark .number-pill,
+.dark .pipeline-tabs button span,
+.dark .meeting-card,
+.dark .tag,
+.dark .template-icon,
+.dark .template-card textarea,
+.dark .board-column,
+.dark .detail-dates,
+.dark .note-box,
+.dark .legacy-banner,
+.dark thead {
+  background: var(--secondary);
+  border-color: var(--border);
+}
+.dark .focus-icon,
+.dark .timeline-icon {
+  background: var(--accent);
+  color: var(--primary);
+}
+.dark .nav-item:hover,
+.dark .button.secondary:hover,
+.dark .icon-button:hover,
+.dark .followup-item:hover,
+.dark tbody tr:hover {
+  background: var(--accent);
+}
+.dark .nav-item.active {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+.dark .nav-count {
+  background: #354b36;
+  color: #d2e8c9;
+}
+.dark .button.primary {
+  color: var(--primary-foreground);
+}
+.dark .button.primary:hover {
+  background: #b1d8b7;
+}
+.dark .button.secondary {
+  background: var(--card);
+  color: var(--foreground);
+  border-color: var(--input);
+}
+.dark .view-switch button.selected,
+.dark .meeting-date {
+  background: var(--card);
+  color: var(--primary);
+  border-color: var(--border);
+}
+.dark .pipeline-tabs button.selected {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+.dark .workspace > svg,
+.dark .nav-label,
+.dark .nav-item,
+.dark .sidebar-note p,
+.dark .breadcrumbs > span,
+.dark .breadcrumbs > svg,
+.dark .local-indicator,
+.dark .eyebrow,
+.dark .page-heading p,
+.dark .stat-top > span:first-child,
+.dark .stat-foot,
+.dark .focus-strip p,
+.dark .focus-strip p b,
+.dark .number-pill,
+.dark .icon-button,
+.dark .view-switch button,
+.dark .pipeline-tabs button,
+.dark .person-cell small,
+.dark .company-cell,
+.dark .date-cell,
+.dark .date-cell small,
+.dark .muted,
+.dark .table-footer,
+.dark .followup-panel .panel-header > svg,
+.dark .panel-description,
+.dark .followup-item small,
+.dark .followup-item svg,
+.dark .upcoming-label,
+.dark .meeting-card > div:nth-child(2) > span,
+.dark .meeting-card > svg,
+.dark .page-footer,
+.dark .page-footer button,
+.dark .tag,
+.dark .company-card > p,
+.dark .text-button,
+.dark .backup-body p,
+.dark .template-personalize > span,
+.dark .board-heading > span:last-child,
+.dark .board-card > span:not(.avatar),
+.dark .board-card small,
+.dark .empty-state,
+.dark .small-empty,
+.dark .no-meeting,
+.dark .modal-head p,
+.dark .field > span,
+.dark .contact-profile p,
+.dark .detail-dates span,
+.dark .note-box,
+.dark .timeline-item p,
+.dark .timeline-item-heading time,
+.dark .confirm-body,
+.dark .help-content > p,
+.dark .login-card > p,
+.dark .login-footnote {
+  color: var(--muted-foreground);
+}
+.dark .focus-strip strong,
+.dark .person-cell strong,
+.dark .followup-item strong,
+.dark .meeting-card > div:nth-child(2) > strong,
+.dark .empty-state h3,
+.dark .help-content strong {
+  color: var(--foreground);
+}
+.dark th {
+  color: var(--reach-quiet);
+}
+.dark .field input,
+.dark .field textarea,
+.dark .field select {
+  background: var(--background);
+  color: var(--foreground);
+  border-color: var(--input);
+}
+.dark .search-input input {
+  color: var(--foreground);
+}
+.dark .search-input input::placeholder,
+.dark .field input::placeholder,
+.dark .field textarea::placeholder {
+  color: var(--reach-quiet);
+}
+.dark .filter-select {
+  background-color: var(--card) !important;
+  color: var(--foreground) !important;
+  border-color: var(--input);
+}
+.dark .template-personalize {
+  background: var(--card);
+}
+.dark .template-icon {
+  color: var(--primary);
+}
+.dark .template-card textarea {
+  color: var(--foreground);
+}
+.dark .board-card {
+  border-color: var(--border);
+}
+.dark th,
+.dark td,
+.dark .upcoming-label {
+  border-color: var(--border);
+}
+.dark .purple {
+  background: #30263f;
+  color: #c7a9e7;
+}
+.dark .blue {
+  background: #20334b;
+  color: #a6c5eb;
+}
+.dark .orange {
+  background: #3a2f23;
+  color: #e4bd92;
+}
+.dark .green {
+  background: #2b3824;
+  color: #c0d7a1;
+}
+.dark .pink {
+  background: #3b2834;
+  color: #e0b0cb;
+}
+.dark .teal {
+  background: #20392f;
+  color: #a1d7bf;
+}
+.dark .status-warm {
+  background: #3b2f1d;
+  border-color: #59492d;
+  color: #e8c283;
+}
+.dark .status-no-response {
+  background: #2b2d35;
+  border-color: #41434e;
+  color: #bec0ce;
+}
+.dark .status-meeting {
+  background: #273a2b;
+  border-color: #3d5640;
+  color: #aed6b5;
+}
+.dark .status-to-reach-out {
+  background: #233348;
+  border-color: #344c68;
+  color: #aac8ec;
+}
+.dark .status-closed {
+  background: #3d2929;
+  border-color: #5d3c3c;
+  color: #e6b4af;
+}
+.dark .status-not-checked {
+  background: #33332c;
+  border-color: #4e4d40;
+  color: #c6c5b0;
+}
+.dark .profile-card {
+  background: #203c2e;
+  border-color: #3a5445;
+}
+.dark .danger {
+  color: #efaba5 !important;
+}
+.dark .error-banner {
+  background: #3b2a25;
+  color: #efb8a0;
+}
+.dark .login-error {
+  color: var(--destructive);
+}
+.dark .login-shell {
+  background: radial-gradient(ellipse at top, #1c3021, var(--background) 70%);
+}
+.dark .modal {
+  box-shadow: 0 20px 100px #0007;
+}
+.dark [data-slot="dialog-overlay"] {
+  background: #060d09b3;
+}
+@media (max-width: 480px) {
+  .login-theme-toggle[data-slot="button"] {
+    top: 16px;
+    right: 16px;
+  }
+}
