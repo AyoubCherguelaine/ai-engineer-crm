@@ -47,6 +47,8 @@ The migration saves a backup and refuses to overwrite an initialized destination
 
 ## Your workflow
 
+Use the sun/moon button on the login page or workspace toolbar to switch between light and dark mode. The app follows your system theme until you choose one, then remembers your choice in this browser.
+
 1. Open **My profile & resources** and add your skills, portfolio URL, and shareable CV link.
 2. Add companies with their niche, country, LinkedIn, website, and description.
 3. Add people and link them to companies. Both contacts and companies default to **Not checked**. Change their status from the edit form.
