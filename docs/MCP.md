@@ -103,7 +103,19 @@ The check should report `connected: true`, ten tool names, and the `reach://usag
 
 List tools default to `limit: 50`, allow up to 100 results per page, and return `total`, `offset`, and `limit`. Request subsequent pages by increasing `offset`. `q` searches names, roles, niches, countries, descriptions, email, and LinkedIn as applicable; it does not search private notes or activities.
 
-Tool schemas describe accepted fields and enforce validation. See the [REST field reference](../README.md#json-api) for the full contact/company field lists. A contact's `companyId` must refer to an existing company, so create the company first. Both create tools accept an optional stable `id`; an existing ID returns a conflict rather than creating a duplicate. Read/list first to avoid duplicate people and teams.
+Tool schemas describe accepted fields and enforce validation. See the [REST field reference](../README.md#json-api) for the full contact and company field lists. Both create tools accept an optional stable `id`. An existing ID returns a conflict.
+
+## Adding and updating CRM records
+
+- For new records, use MCP `create_company` or `create_contact`, or REST `POST /api/companies` and `POST /api/contacts`.
+- Never replace the whole workspace with `PUT /api/workspace`.
+- Search for duplicates first.
+- Create the company first, then link the contact using `companyId`. Reuse the company ID if it already exists.
+- For updates, read the latest revision and supply `expectedRevision` through MCP or `If-Match` through REST.
+- If a revision conflict occurs, reread and review the latest data before retrying.
+- After an uncertain response, check whether creation succeeded before retrying.
+- Preserve unrelated records and fields.
+- Confirm success only after the server confirms it.
 
 Statuses for both record types:
 
