@@ -115,8 +115,17 @@ test("official SDK initializes, discovers typed tools, and reads the usage resou
   );
   const resources = await client.listResources();
   assert.equal(resources.resources[0].uri, "reach://usage");
-  const guide = await client.readResource({ uri: "reach://usage" });
-  assert.match(guide.contents[0].text, /untrusted data/);
+  const { contents } = await client.readResource({ uri: "reach://usage" });
+  const guide = contents[0].text;
+  assert.equal(client.getInstructions(), guide);
+  assert.match(guide, /untrusted data/);
+  assert.match(
+    guide,
+    /Never replace the whole workspace with PUT \/api\/workspace/,
+  );
+  assert.match(guide, /expectedRevision through MCP or If-Match through REST/);
+  assert.match(guide, /check whether creation succeeded before retrying/);
+  assert.match(guide, /Confirm success only after the server confirms it/);
   assert.equal(JSON.stringify(tools).includes(token), false);
 });
 test("profile, company/contact creation, linked reads, summaries, and filters work through MCP", async () => {
