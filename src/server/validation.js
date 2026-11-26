@@ -46,6 +46,16 @@ const activity = z
   })
   .strict();
 export const recordId = id;
+const createId = z
+  .union([id, z.literal(""), z.null()])
+  .transform((value) => value || undefined)
+  .describe("Optional custom record ID. Leave it out to generate a UUID.");
+const companyLink = z
+  .union([id, z.literal(""), z.null()])
+  .transform((value) => value ?? "")
+  .describe(
+    "Existing company ID from list_companies. Use an empty string or null for no company.",
+  );
 export const activityLog = activity
   .omit({ id: true })
   .extend({ status: z.enum(statuses), note: text.default("") })
@@ -105,12 +115,12 @@ export const contactDefaults = {
   color: "purple",
 };
 export const companyCreate = z
-  .object({ ...companyShape, id })
+  .object({ ...companyShape, id: createId })
   .partial()
   .extend({ name })
   .strict();
 export const contactCreate = z
-  .object({ ...contactShape, id })
+  .object({ ...contactShape, companyId: companyLink, id: createId })
   .partial()
   .extend({ name })
   .strict();
@@ -123,7 +133,7 @@ export const companyPatch = z
     "Supply at least one field to update.",
   );
 export const contactPatch = z
-  .object(contactShape)
+  .object({ ...contactShape, companyId: companyLink })
   .partial()
   .strict()
   .refine(

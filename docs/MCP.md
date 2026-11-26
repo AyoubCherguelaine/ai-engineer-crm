@@ -1,6 +1,6 @@
 # Reach MCP: connect an LLM to your CRM
 
-Reach exposes ten tools through **Streamable HTTP** at:
+The Reach **Streamable HTTP** endpoint is:
 
 ```text
 http://localhost:5173/api/mcp
@@ -84,7 +84,7 @@ If you supply the key as an environment variable instead of using a local `.env`
 node scripts/mcp-check.mjs https://crm.example.com/api/mcp
 ```
 
-The check should report `connected: true`, ten tool names, and the `reach://usage` resource. The source in [scripts/mcp-check.mjs](../scripts/mcp-check.mjs) is also a working JavaScript SDK client example.
+The check should report `connected: true`, eleven tool names, and the `reach://usage` resource. The source in [scripts/mcp-check.mjs](../scripts/mcp-check.mjs) is also a working JavaScript SDK client example.
 
 ## Tools
 
@@ -100,10 +100,13 @@ The check should report `connected: true`, ten tool names, and the `reach://usag
 | `create_company`       | `name` plus optional company fields                    | Add a company; defaults to `Not checked`.                                          |
 | `update_company`       | `id`, `changes`, optional `expectedRevision`           | Patch supplied company fields.                                                     |
 | `log_contact_activity` | `contactId`, `activity`, optional `expectedRevision`   | Atomically append history and update the contact's status and relevant dates.      |
+| `list_mcp_logs`        | Optional `limit`, `beforeId`                            | Review successful MCP edits by tool, record ID, changed fields, and revision.      |
 
 List tools default to `limit: 50`, allow up to 100 results per page, and return `total`, `offset`, and `limit`. Request subsequent pages by increasing `offset`. `q` searches names, roles, niches, countries, descriptions, email, and LinkedIn as applicable; it does not search private notes or activities.
 
-Tool schemas describe accepted fields and enforce validation. See the [REST field reference](../README.md#json-api) for the full contact/company field lists. A contact's `companyId` must refer to an existing company, so create the company first. Both create tools accept an optional stable `id`; an existing ID returns a conflict rather than creating a duplicate. Read/list first to avoid duplicate people and teams.
+Tool schemas describe accepted fields and enforce validation. See the [REST field reference](../README.md#json-api) for the full contact/company field lists. To link a contact, use the saved company ID returned by the CRM. For an independent contact, omit `companyId` or use an empty string or `null`. Leave out `id` on creation to generate a UUID. A supplied custom ID must be unique within its record type.
+
+The `mcp_logs` table keeps the latest 5,000 successful MCP edits. Each entry records the UTC timestamp, tool, record ID, changed field names, and workspace revision. Older entries are deleted automatically. To fetch the next page, pass the response's `nextBeforeId` as `beforeId`.
 
 Statuses for both record types:
 

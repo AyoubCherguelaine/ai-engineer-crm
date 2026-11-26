@@ -18,12 +18,18 @@ for (const key of [
 const directory = mkdtempSync(join(tmpdir(), "reach-storage-test-"));
 process.env.CRM_DB_PATH = join(directory, "local.sqlite");
 const { databaseConfig } = await import("../src/server/database-config.js");
-const { readWorkspace, closeDatabases, mutateWorkspace } =
-  await import("../src/server/database.js");
-const { createRecord, logContactActivity, updateRecord } =
-  await import("../src/server/crm-service.js");
-const { readLocalWorkspace, importIntoEmptyDatabase } =
-  await import("../src/server/workspace-migration.js");
+const { readWorkspace, closeDatabases } = await import(
+  "../src/server/database.js"
+);
+const { initializeWorkspace, readStoredWorkspace } = await import(
+  "../src/server/workspace-storage.js"
+);
+const { createRecord, logContactActivity, updateRecord } = await import(
+  "../src/server/crm-service.js"
+);
+const { readLocalWorkspace, importIntoEmptyDatabase } = await import(
+  "../src/server/workspace-migration.js"
+);
 const { workspaceFixture } = await import("./helpers/workspace-fixture.mjs");
 let fixture;
 after(async () => {
@@ -148,17 +154,17 @@ test("old SQLite workspace migrates without changing its source and refuses a po
     const result = await importIntoEmptyDatabase(destination, snapshot);
     assert.equal(result.contacts, data.contacts.length);
     assert.equal(result.revision, 8);
-    const stored = (await destination.execute("SELECT data FROM workspace"))
-      .rows[0].data;
-    assert.deepEqual(JSON.parse(stored), snapshot.data);
+    const stored = await readStoredWorkspace(destination);
+    assert.deepEqual(stored.data, snapshot.data);
+    assert.deepEqual(
+      await readLocalWorkspace(join(directory, "migration-target.sqlite")),
+      stored,
+    );
     await assert.rejects(
       importIntoEmptyDatabase(destination, snapshot),
       (error) => error.status === 409,
     );
-    assert.equal(
-      (await destination.execute("SELECT data FROM workspace")).rows[0].data,
-      stored,
-    );
+    assert.deepEqual(await readStoredWorkspace(destination), stored);
     const verifySource = createClient({ url: pathToFileURL(sourcePath).href });
     try {
       assert.equal(
@@ -170,6 +176,77 @@ test("old SQLite workspace migrates without changing its source and refuses a po
     }
   } finally {
     destination.close();
+  }
+});
+test("concurrent schema initialization migrates legacy IDs, company links, activity and revision once", async () => {
+  const url = pathToFileURL(join(directory, "upgrade.sqlite")).href;
+  const first = createClient({ url });
+  const second = createClient({ url });
+  const data = workspaceFixture();
+  data.contacts[0].activities = [
+    {
+      id: "historic-note",
+      type: "Note",
+      date: "2026-11-12",
+      note: "Retain this history.",
+    },
+  ];
+  data.contacts.push({
+    ...data.contacts[0],
+    id: "independent",
+    companyId: "",
+    activities: [],
+  });
+  try {
+    await first.batch(
+      [
+        "CREATE TABLE workspace(id INTEGER PRIMARY KEY,data TEXT,revision INTEGER,initialized INTEGER)",
+        {
+          sql: "INSERT INTO workspace VALUES(1,?,8,1)",
+          args: [JSON.stringify(data)],
+        },
+      ],
+      "write",
+    );
+    await Promise.all([
+      initializeWorkspace(first),
+      initializeWorkspace(second),
+    ]);
+    assert.deepEqual(await readStoredWorkspace(second), {
+      data,
+      revision: 8,
+      initialized: true,
+    });
+    assert.deepEqual(
+      (
+        await first.execute(
+          "SELECT id, company_id FROM contacts ORDER BY position",
+        )
+      ).rows,
+      [
+        { id: "fixture-person", company_id: "fixture-company" },
+        { id: "independent", company_id: null },
+      ],
+    );
+    assert.deepEqual(
+      JSON.parse(
+        (await first.execute("SELECT data FROM workspace")).rows[0].data,
+      ),
+      { profile: data.profile, demo: data.demo },
+    );
+    assert.deepEqual(
+      (await first.execute("PRAGMA foreign_key_check")).rows,
+      [],
+    );
+    await assert.rejects(
+      first.execute(
+        "UPDATE contacts SET company_id = 'missing' WHERE id = 'fixture-person'",
+      ),
+      /FOREIGN KEY/,
+    );
+  } finally {
+    first.close();
+    second.close();
   }
 });
 test("the official remote HTTP client reads and writes shared data without opening a local database", async () => {

@@ -21,8 +21,9 @@ process.env.CRM_API_TOKEN = "mcp-unit-test-token-with-more-than-32-characters";
 const token = process.env.CRM_API_TOKEN;
 const { handleMcpRequest } = await import("../src/server/mcp/http.js");
 const { recordRoutes } = await import("../src/server/records.js");
-const { readWorkspace, closeDatabases } =
-  await import("../src/server/database.js");
+const { database, readWorkspace, closeDatabases } = await import(
+  "../src/server/database.js"
+);
 const client = new Client({ name: "reach-mcp-test-client", version: "1.0.0" });
 const transport = new StreamableHTTPClientTransport(
   new URL("http://localhost:5173/api/mcp"),
@@ -95,7 +96,7 @@ test("MCP checks origins and advertises stateless POST without opening SSE strea
 test("official SDK initializes, discovers typed tools, and reads the usage resource", async () => {
   await client.connect(transport);
   const tools = await client.listTools();
-  assert.equal(tools.tools.length, 10);
+  assert.equal(tools.tools.length, 11);
   assert.equal(
     tools.tools.find((t) => t.name === "get_contact").annotations.readOnlyHint,
     true,
@@ -300,4 +301,135 @@ test("rotating the integration key immediately rejects the old bearer token", as
     405,
   );
   process.env.CRM_API_TOKEN = token;
+});
+
+test("MCP generates IDs for omitted or blank IDs and supports independent contacts and unlinking", async () => {
+  if (!client.getServerVersion()) await client.connect(transport);
+  const company = value(
+    await client.callTool({
+      name: "create_company",
+      arguments: { name: "Company for ID tests" },
+    }),
+  );
+  for (const args of [
+    {},
+    { id: "", companyId: null },
+    { id: null, companyId: company.data.id },
+  ]) {
+    const created = value(
+      await client.callTool({
+        name: "create_contact",
+        arguments: { name: "Generated ID", ...args },
+      }),
+    );
+    const { id, companyId } = created.data;
+    assert.match(
+      id,
+      /^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/,
+    );
+    assert.equal(companyId, args.companyId ?? "");
+    if (companyId) {
+      const updated = value(
+        await client.callTool({
+          name: "update_contact",
+          arguments: {
+            id,
+            changes: { companyId: null },
+            expectedRevision: created.revision,
+          },
+        }),
+      );
+      assert.equal(updated.data.companyId, "");
+    }
+  }
+});
+
+test("MCP edit history records successful changes once and pages back to earlier edits", async () => {
+  if (!client.getServerVersion()) await client.connect(transport);
+  const created = value(
+    await client.callTool({
+      name: "create_contact",
+      arguments: { name: "Audit pagination contact" },
+    }),
+  );
+  const id = created.data.id;
+  const updated = value(
+    await client.callTool({
+      name: "log_contact_activity",
+      arguments: {
+        contactId: id,
+        activity: {
+          type: "Reply received",
+          date: "2026-11-13",
+          status: "Warm",
+          note: "Private audit test note",
+        },
+      },
+    }),
+  );
+  const stale = await client.callTool({
+    name: "update_contact",
+    arguments: {
+      id,
+      changes: { role: "Rejected edit" },
+      expectedRevision: created.revision,
+    },
+  });
+  assert.equal(stale.structuredContent.error.status, 409);
+
+  const first = value(
+    await client.callTool({ name: "list_mcp_logs", arguments: { limit: 1 } }),
+  );
+  const entry = first.data[0];
+  assert.equal(first.nextBeforeId, entry.id);
+  assert.equal(entry.tool, "log_contact_activity");
+  assert.equal(entry.recordId, id);
+  assert.equal(entry.revision, updated.revision);
+  assert.ok(entry.fields.includes("replyDate"));
+  assert.ok(Number.isFinite(Date.parse(entry.createdAt)));
+  assert.equal(
+    JSON.stringify(entry).includes("Private audit test note"),
+    false,
+  );
+
+  const second = value(
+    await client.callTool({
+      name: "list_mcp_logs",
+      arguments: { beforeId: first.nextBeforeId, limit: 1 },
+    }),
+  );
+  assert.equal(second.data[0].tool, "create_contact");
+  assert.equal(second.data[0].recordId, id);
+  assert.equal(second.data[0].revision, created.revision);
+  assert.ok(second.data[0].id < first.nextBeforeId);
+});
+
+test("SQLite deletes oldest MCP log rows and a failed audit rolls the contact edit back", async () => {
+  if (!client.getServerVersion()) await client.connect(transport);
+  const db = await database();
+  await db.execute(`WITH RECURSIVE items(n) AS (
+    SELECT 1 UNION ALL SELECT n + 1 FROM items WHERE n < 5001
+  ) INSERT INTO mcp_logs (tool, record_id, fields, revision)
+    SELECT 'test', 'retention', '[]', n FROM items`);
+  assert.deepEqual(
+    (
+      await db.execute(
+        "SELECT COUNT(*) AS count, MIN(revision) AS oldest, MAX(revision) AS newest FROM mcp_logs",
+      )
+    ).rows[0],
+    { count: 5000, oldest: 2, newest: 5001 },
+  );
+  const before = await readWorkspace();
+  await db.execute(`CREATE TRIGGER fail_test_audit BEFORE INSERT ON mcp_logs
+    WHEN NEW.record_id = 'fail-audit' BEGIN SELECT RAISE(ABORT, 'Test audit failure'); END`);
+  try {
+    const failed = await client.callTool({
+      name: "create_contact",
+      arguments: { id: "fail-audit", name: "Rollback" },
+    });
+    assert.equal(failed.isError, true);
+    assert.deepEqual(await readWorkspace(), before);
+  } finally {
+    await db.execute("DROP TRIGGER fail_test_audit");
+  }
 });

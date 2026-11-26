@@ -61,7 +61,7 @@ Use the sun/moon button on the login page or workspace toolbar to switch between
 
 A token-authenticated Streamable HTTP MCP server runs at **`http://localhost:5173/api/mcp`**. A dedicated `CRM_API_TOKEN` has been generated in `.env`. LLM clients can search, create, read, and update contacts/companies, read your profile, and log dated activities with explicit statuses.
 
-See **[docs/MCP.md](docs/MCP.md)** for Codex and Copilot connection examples, all ten tools, argument examples, token rotation, deployment, and the read-only `npm run mcp:check` connection check. [public/llms.txt](public/llms.txt) is also served at `/llms.txt` for discovery.
+See **[docs/MCP.md](docs/MCP.md)** for Codex and Copilot connection examples, MCP tools and edit history, argument examples, token rotation, deployment, and the read-only `npm run mcp:check` connection check. [public/llms.txt](public/llms.txt) is also served at `/llms.txt` for discovery.
 
 ## JSON API
 

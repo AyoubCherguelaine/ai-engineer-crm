@@ -136,14 +136,16 @@ A local machine with your server's `CRM_API_TOKEN` configured can check the depl
 npm run mcp:check -- https://your-site.netlify.app/api/mcp
 ```
 
-Update LLM client URLs from localhost to `https://your-site.netlify.app/api/mcp`. Keep using the **CRM** bearer token, not the Turso database token. The endpoint and all ten tool names are unchanged. See [MCP.md](MCP.md).
+Update LLM client URLs from localhost to `https://your-site.netlify.app/api/mcp`. Keep using the **CRM** bearer token, not the Turso database token. The endpoint and existing tool names are unchanged. The `list_mcp_logs` tool shows recent edits. See [MCP.md](MCP.md).
 
 Redeploy after changing Netlify environment values. Migrating storage does not itself publish the site or configure cloud credentials.
 
 ## Storage behavior and verification limits
 
-Remote requests use `@libsql/client/web` over HTTP(S); they do not create a local database, download a replica, or use writable disk. Local mode uses `@libsql/client/node`, with the existing SQLite file format and workspace table preserved. `better-sqlite3` is no longer a dependency.
+Remote requests use `@libsql/client/web` over HTTP(S). Local mode uses `@libsql/client/node` with the existing SQLite file. On first connection, the server migrates legacy workspace JSON into `contacts` and `companies` tables while retaining IDs, company links, profile, and revision. The `workspace` table holds profile and revision metadata. Each successful MCP edit records an entry in `mcp_logs`, which automatically drops its oldest rows above 5,000.
 
-Connections are cached per configuration. Schema initialization is idempotent. Updates use an atomic `UPDATE ... WHERE revision = ?` compare-and-swap operation. A supplied stale revision returns `409`; operations without a supplied revision retry conflicts against fresh data a bounded number of times. This preserves unrelated changes and concurrent activity appends across independent function instances.
+Deploy the updated server before running `npm run db:check` against a live legacy database. The first connection changes the storage format and older server code expects the legacy format.
+
+Connections are cached per configuration. Record changes, MCP audit entries, and workspace revision advances commit in the same transaction. A supplied stale revision returns `409`. Operations without a supplied revision retry conflicts against fresh data a bounded number of times.
 
 Automated tests cover local storage, migration, concurrent writes, fail-closed configuration, authentication failures, and the official remote HTTP client against a loopback libSQL protocol fixture. Those tests do not replace connecting to your actual Turso account. Run `npm run db:check` with your real credentials before deploying.

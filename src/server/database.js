@@ -1,33 +1,22 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { emptyWorkspace, normalizeWorkspace } from "./validation.js";
+import { normalizeWorkspace } from "./validation.js";
+import {
+  initializeWorkspace,
+  readStoredWorkspace,
+  writeStoredWorkspace,
+} from "./workspace-storage.js";
 import { databaseConfig } from "./database-config.js";
 import { ApiError } from "./errors.js";
 
 const connections = (globalThis.__reachLibsqlConnections ??= new Map());
-const createTable =
-  "CREATE TABLE IF NOT EXISTS workspace (id INTEGER PRIMARY KEY CHECK(id = 1), data TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 0, initialized INTEGER NOT NULL DEFAULT 0)";
-const selectWorkspace =
-  "SELECT data,revision,initialized FROM workspace WHERE id=1";
 const conflict = () =>
   new ApiError(
     409,
     "The workspace changed in another tab or through the API. Export any unsaved changes, then reload to get the latest data.",
   );
 
-export async function initializeWorkspace(client) {
-  await client.batch(
-    [
-      createTable,
-      {
-        sql: "INSERT OR IGNORE INTO workspace(id,data) VALUES(1,?)",
-        args: [JSON.stringify(emptyWorkspace())],
-      },
-    ],
-    "write",
-  );
-}
-async function openConnection(config) {
+export async function connectDatabase(config) {
   let client;
   try {
     if (config.mode === "turso") {
@@ -59,11 +48,19 @@ async function openConnection(config) {
       await chmod(path, 0o600);
       await client.execute("PRAGMA journal_mode = WAL");
     }
-    // Idempotent and atomic when multiple function instances connect together.
-    await initializeWorkspace(client);
     return client;
   } catch (error) {
     client?.close();
+    throw error;
+  }
+}
+async function openConnection(config) {
+  const client = await connectDatabase(config);
+  try {
+    await initializeWorkspace(client);
+    return client;
+  } catch (error) {
+    client.close();
     throw error;
   }
 }
@@ -85,43 +82,26 @@ export async function database() {
     throw error;
   }
 }
-function decodeWorkspace(row) {
-  if (!row) throw new Error("Workspace metadata is missing.");
-  const revision = Number(row.revision);
-  if (!Number.isSafeInteger(revision) || revision < 0)
-    throw new Error("Invalid workspace revision.");
-  return {
-    data: normalizeWorkspace(JSON.parse(String(row.data))),
-    revision,
-    initialized: Boolean(Number(row.initialized)),
-  };
-}
 export async function readWorkspace() {
-  const client = await database();
-  const result = await client.execute(selectWorkspace);
-  return decodeWorkspace(result.rows[0]);
+  return readStoredWorkspace(await database());
 }
-export async function mutateWorkspace(transform, expectedRevision) {
+
+export async function mutateWorkspace(transform, expectedRevision, audit) {
   const client = await database();
-  // Compare-and-swap keeps a snapshot update atomic across independent serverless
-  // instances without holding an interactive remote transaction across requests.
   for (let attempt = 0; attempt < 8; attempt++) {
-    const current = decodeWorkspace(
-      (await client.execute(selectWorkspace)).rows[0],
-    );
+    const current = await readStoredWorkspace(client);
     if (expectedRevision !== undefined && expectedRevision !== current.revision)
       throw conflict();
     const data = normalizeWorkspace(transform(structuredClone(current.data)));
-    const revision = current.revision + 1;
-    const result = await client.execute({
-      sql: "UPDATE workspace SET data=?,revision=?,initialized=1 WHERE id=1 AND revision=?",
-      args: [JSON.stringify(data), revision, current.revision],
-    });
-    if (result.rowsAffected === 1) return { data, revision, initialized: true };
+    const next = { data, revision: current.revision + 1, initialized: true };
+    const change = audit?.(current.data, next.data);
+    if (await writeStoredWorkspace(client, current, next, { audit: change }))
+      return next;
     if (expectedRevision !== undefined) throw conflict();
   }
   throw conflict();
 }
+
 export async function closeDatabases() {
   const pending = [...connections.values()];
   connections.clear();
