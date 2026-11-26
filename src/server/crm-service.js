@@ -13,24 +13,12 @@ import {
 } from "./validation.js";
 import { addContactActivity } from "../lib/contact-activity.js";
 import { ApiError } from "./errors.js";
+import { auditRecords } from "./mcp-audit.js";
 
 function find(data, kind, id) {
   const record = data[kind].find((r) => r.id === id);
   if (!record) throw new ApiError(404, "Record not found.");
   return record;
-}
-function auditEdit(tool, kind, id) {
-  if (!tool) return undefined;
-  return (before, after) => {
-    const previous = before[kind].find((record) => record.id === id);
-    const next = find(after, kind, id);
-    const fields = Object.keys(next).filter(
-      (key) =>
-        key !== "id" &&
-        JSON.stringify(previous?.[key]) !== JSON.stringify(next[key]),
-    );
-    return fields.length ? { tool, recordId: id, fields } : undefined;
-  };
 }
 export async function listRecords(
   kind,
@@ -89,7 +77,7 @@ export async function createRecord(kind, value, expectedRevision, tool) {
       return data;
     },
     expectedRevision,
-    auditEdit(tool, kind, record.id),
+    auditRecords(tool, kind, record.id),
   );
   return { data: record, revision: result.revision };
 }
@@ -103,7 +91,7 @@ export async function updateRecord(kind, id, value, expectedRevision, tool) {
       return data;
     },
     expectedRevision,
-    auditEdit(tool, kind, id),
+    auditRecords(tool, kind, id),
   );
   return { data: record, revision: result.revision };
 }
@@ -129,7 +117,7 @@ export async function logContactActivity(id, value, expectedRevision, tool) {
       return data;
     },
     expectedRevision,
-    auditEdit(tool, "contacts", id),
+    auditRecords(tool, "contacts", id),
   );
   return { data: record, revision: result.revision };
 }

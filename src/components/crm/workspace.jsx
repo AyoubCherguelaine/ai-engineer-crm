@@ -33,6 +33,7 @@ import {
 import {
   statuses,
   localDate,
+  shiftDate,
   formatDate,
   validateImport,
   safeUrl,
@@ -63,18 +64,32 @@ import { useWorkspaceStorage } from "@/hooks/use-workspace-storage";
 import { WorkspaceSkeleton } from "./workspace-skeleton";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Today } from "./today";
+import { ImportContacts, MergeContacts } from "./contact-tools";
+import { McpHistory } from "./mcp-history";
+import { completeFollowUp, followUpQueue } from "@/lib/follow-up-queue";
 const navItems = [
   ["Overview", LayoutDashboard],
+  ["Today", CalendarDays],
   ["Contacts", Users],
   ["Companies", Building2],
   ["Message templates", FileText],
+  ["MCP history", Clock3],
 ];
 
 export default App;
 
 function App() {
-  const { data, setData, ready, saveError, saving, loadError, legacyData } =
-    useWorkspaceStorage();
+  const {
+    data,
+    setData,
+    runAction,
+    ready,
+    saveError,
+    saving,
+    loadError,
+    legacyData,
+  } = useWorkspaceStorage();
   const [page, setPage] = useState("Overview"),
     [query, setQuery] = useState(""),
     [filter, setFilter] = useState("All contacts"),
@@ -120,9 +135,17 @@ function App() {
         .includes(query.toLowerCase()),
   );
   const today = localDate();
-  const followups = data.contacts
-    .filter((c) => c.followUp && c.followUp <= today && c.status !== "Closed")
-    .sort((a, b) => a.followUp.localeCompare(b.followUp));
+  const queue = followUpQueue(data.contacts, today);
+  const updateDueContact = (id, change) =>
+    setData((workspace) => ({
+      ...workspace,
+      contacts: workspace.contacts.map((contact) =>
+        contact.id === id && contact.followUp && contact.followUp <= today
+          ? change(contact)
+          : contact,
+      ),
+    }));
+  const followups = [...queue.overdue, ...queue.today];
   const meetings = data.contacts
     .filter(
       (c) => c.meetingDate && c.meetingDate >= today && c.status === "Meeting",
@@ -316,6 +339,25 @@ function App() {
               reloading.
             </div>
           )}
+          {page === "Today" && (
+            <Today
+              queue={queue}
+              onOpen={setSelected}
+              saving={saving}
+              onSnooze={(id) =>
+                updateDueContact(id, (contact) => ({
+                  ...contact,
+                  followUp: shiftDate(1),
+                }))
+              }
+              onSent={(id) =>
+                updateDueContact(id, (contact) =>
+                  completeFollowUp(contact, today),
+                )
+              }
+            />
+          )}
+          {page === "MCP history" && <McpHistory runAction={runAction} />}
           {(page === "Overview" || page === "Contacts") && (
             <>
               <div className="page-heading">
@@ -332,10 +374,30 @@ function App() {
                       : "The founders, builders, and teams you want to work with."}
                   </p>
                 </div>
-                <Button className="button primary" onClick={addContact}>
-                  <Plus size={17} />
-                  Add contact
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  {page === "Contacts" && (
+                    <>
+                      <Button
+                        variant="outline"
+                        disabled={saving}
+                        onClick={() => setModal({ type: "csv" })}
+                      >
+                        Import CSV
+                      </Button>
+                      <Button
+                        variant="outline"
+                        disabled={saving || data.contacts.length < 2}
+                        onClick={() => setModal({ type: "merge" })}
+                      >
+                        Merge contacts
+                      </Button>
+                    </>
+                  )}
+                  <Button className="button primary" onClick={addContact}>
+                    <Plus size={17} />
+                    Add contact
+                  </Button>
+                </div>
               </div>
               <div className="stats-grid">
                 {[
@@ -996,10 +1058,40 @@ function App() {
           toast={toast}
         />
       )}
+      {modal?.type === "merge" && (
+        <MergeContacts
+          contacts={data.contacts}
+          runAction={runAction}
+          onClose={(id) => {
+            setModal(null);
+            if (id) {
+              setSelected(id);
+              toast.success("Contacts merged.");
+            }
+          }}
+        />
+      )}
+      {modal?.type === "csv" && (
+        <ImportContacts
+          runAction={runAction}
+          onClose={(count) => {
+            setModal(null);
+            if (count)
+              toast.success(
+                `Imported ${count} ${count === 1 ? "row" : "rows"}.`,
+              );
+          }}
+        />
+      )}
       {modal?.type === "contact" && (
         <ContactForm
           contact={modal.contact}
+          contacts={data.contacts}
           companies={data.companies}
+          onViewDuplicate={(id) => {
+            setModal(null);
+            setSelected(id);
+          }}
           onClose={() => setModal(null)}
           onSave={(c) => {
             setData((d) => ({

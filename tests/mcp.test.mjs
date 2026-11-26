@@ -96,7 +96,7 @@ test("MCP checks origins and advertises stateless POST without opening SSE strea
 test("official SDK initializes, discovers typed tools, and reads the usage resource", async () => {
   await client.connect(transport);
   const tools = await client.listTools();
-  assert.equal(tools.tools.length, 11);
+  assert.equal(tools.tools.length, 14);
   assert.equal(
     tools.tools.find((t) => t.name === "get_contact").annotations.readOnlyHint,
     true,
@@ -402,6 +402,59 @@ test("MCP edit history records successful changes once and pages back to earlier
   assert.equal(second.data[0].recordId, id);
   assert.equal(second.data[0].revision, created.revision);
   assert.ok(second.data[0].id < first.nextBeforeId);
+});
+
+test("MCP detects duplicate contact identities and exposes before/after details after merge", async () => {
+  if (!client.getServerVersion()) await client.connect(transport);
+  const primary = value(
+    await client.callTool({
+      name: "create_contact",
+      arguments: { name: "MCP merge target", email: "merge-mcp@example.com" },
+    }),
+  );
+  const secondary = value(
+    await client.callTool({
+      name: "create_contact",
+      arguments: { name: "MCP merge source", notes: "Move this note" },
+    }),
+  );
+  const matches = value(
+    await client.callTool({
+      name: "find_contact_duplicates",
+      arguments: { email: "MERGE-MCP@example.com" },
+    }),
+  );
+  assert.deepEqual(
+    matches.data.map(({ id }) => id),
+    [primary.data.id],
+  );
+  const duplicate = await client.callTool({
+    name: "create_contact",
+    arguments: { name: "MCP duplicate", email: "MERGE-MCP@example.com" },
+  });
+  assert.equal(duplicate.structuredContent.error.status, 409);
+  const merged = value(
+    await client.callTool({
+      name: "merge_contacts",
+      arguments: {
+        keepId: primary.data.id,
+        mergeId: secondary.data.id,
+        expectedRevision: secondary.revision,
+      },
+    }),
+  );
+  assert.equal(merged.data.notes, "Move this note");
+  const {
+    data: [entry],
+  } = value(
+    await client.callTool({ name: "list_mcp_logs", arguments: { limit: 1 } }),
+  );
+  const log = value(
+    await client.callTool({ name: "get_mcp_log", arguments: { id: entry.id } }),
+  );
+  assert.equal(log.changes[0].before.notes, "");
+  assert.equal(log.changes[0].after.notes, "Move this note");
+  assert.equal(log.changes[1].after, null);
 });
 
 test("SQLite deletes oldest MCP log rows and a failed audit rolls the contact edit back", async () => {

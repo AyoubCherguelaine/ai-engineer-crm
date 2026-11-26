@@ -2,6 +2,7 @@
 import { useState } from "react";
 
 import { statuses, uid } from "@/lib/crm-data";
+import { newContactConflict } from "@/lib/contact-matches";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,13 +34,24 @@ const emptyContact = {
 
 export { ContactForm, CompanyForm };
 
-function ContactForm({ contact, companies, onSave, onClose }) {
+function ContactForm({
+  contact,
+  contacts,
+  companies,
+  onSave,
+  onClose,
+  onViewDuplicate,
+}) {
   const [form, setForm] = useState(contact || { ...emptyContact });
+  const [duplicates, setDuplicates] = useState([]);
   const input = (key, props = {}) => (
     <Input
       {...props}
       value={form[key]}
-      onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+      onChange={(e) => {
+        setForm({ ...form, [key]: e.target.value });
+        if (key === "email" || key === "linkedin") setDuplicates([]);
+      }}
     />
   );
   return (
@@ -51,7 +63,25 @@ function ContactForm({ contact, companies, onSave, onClose }) {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          onSave({ ...form, name: form.name.trim(), id: form.id || uid() });
+          const record = {
+            ...form,
+            name: form.name.trim(),
+            id: form.id || uid(),
+          };
+          const next = [
+            ...contacts.filter(({ id }) => id !== record.id),
+            record,
+          ];
+          const conflicts = newContactConflict(contacts, next);
+          if (conflicts) {
+            setDuplicates(
+              contacts.filter(
+                ({ id }) => id !== record.id && conflicts.includes(id),
+              ),
+            );
+            return;
+          }
+          onSave(record);
         }}
       >
         <div className="form-grid">
@@ -149,6 +179,25 @@ function ContactForm({ contact, companies, onSave, onClose }) {
             />
           </Field>
         </div>
+        {duplicates.length > 0 && (
+          <div className="mx-5 grid gap-1 rounded-md border p-3" role="alert">
+            <p>
+              This email address or LinkedIn profile already belongs to an
+              existing contact.
+            </p>
+            {duplicates.map(({ id, name }) => (
+              <Button
+                type="button"
+                variant="link"
+                className="h-auto justify-start p-0"
+                key={id}
+                onClick={() => onViewDuplicate(id)}
+              >
+                View {name}
+              </Button>
+            ))}
+          </div>
+        )}
         <div className="modal-footer">
           <Button
             variant="ghost"

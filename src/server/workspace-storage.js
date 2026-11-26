@@ -56,6 +56,19 @@ const schema = [
     fields TEXT NOT NULL CHECK(json_valid(fields) AND json_type(fields) = 'array'),
     revision INTEGER NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS mcp_log_details (
+    log_id INTEGER PRIMARY KEY REFERENCES mcp_logs(id) ON DELETE CASCADE,
+    changes TEXT NOT NULL CHECK(json_valid(changes)),
+    superseded INTEGER NOT NULL DEFAULT 0,
+    undone_revision INTEGER
+  )`,
+  `CREATE TABLE IF NOT EXISTS mcp_log_records (
+    log_id INTEGER NOT NULL REFERENCES mcp_log_details(log_id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    record_id TEXT NOT NULL,
+    PRIMARY KEY(log_id, kind, record_id)
+  )`,
+  "CREATE INDEX IF NOT EXISTS mcp_log_records_lookup ON mcp_log_records(kind, record_id)",
   `CREATE TRIGGER IF NOT EXISTS mcp_logs_retention AFTER INSERT ON mcp_logs
    BEGIN ${expireLogs}; END`,
   expireLogs,
@@ -106,11 +119,37 @@ function decodeRecord(kind) {
     );
 }
 
-function removeRecords(kind, previous, next, guard) {
-  const keep = new Set(next.map(({ id }) => id));
-  const removed = previous
-    .filter(({ id }) => !keep.has(id))
-    .map(({ id }) => id);
+function recordDiff(kind, previous, next) {
+  const prior = new Map(
+    previous.map((record, i) => [
+      record.id,
+      { record, position: i - previous.length },
+    ]),
+  );
+  const changed = [];
+  const edited = [];
+  next.forEach((record, i) => {
+    const position = i - next.length;
+    const existing = prior.get(record.id);
+    const differs =
+      !existing ||
+      columns[kind].some(({ key }) =>
+        key === "activities"
+          ? JSON.stringify(existing.record.activities) !==
+            JSON.stringify(record.activities)
+          : existing.record[key] !== record[key],
+      );
+    if (differs) edited.push({ kind, id: record.id });
+    if (differs || existing.position !== position)
+      changed.push({ ...record, position });
+    prior.delete(record.id);
+  });
+  const removed = [...prior.keys()];
+  for (const id of removed) edited.push({ kind, id });
+  return { changed, removed, edited };
+}
+
+function removeRecords(kind, removed, guard) {
   if (!removed.length) return [];
   return [
     {
@@ -120,28 +159,7 @@ function removeRecords(kind, previous, next, guard) {
   ];
 }
 
-function upsertRecords(kind, previous, next, guard) {
-  const prior = new Map(
-    previous.map((record, i) => [
-      record.id,
-      { record, position: i - previous.length },
-    ]),
-  );
-  const changed = next.flatMap((record, i) => {
-    const position = i - next.length;
-    const existing = prior.get(record.id);
-    if (
-      existing?.position === position &&
-      columns[kind].every(({ key }) =>
-        key === "activities"
-          ? JSON.stringify(existing.record.activities) ===
-            JSON.stringify(record.activities)
-          : existing.record[key] === record[key],
-      )
-    )
-      return [];
-    return [{ ...record, position }];
-  });
+function upsertRecords(kind, changed, guard) {
   if (!changed.length) return [];
   const fields = [...columns[kind], { key: "position", column: "position" }];
   const values = fields.map(({ key }) =>
@@ -167,39 +185,49 @@ export async function writeStoredWorkspace(
   client,
   current,
   next,
-  { legacy = false, audit } = {},
+  { legacy = false, audit, undo } = {},
 ) {
   const condition = `id = 1 AND revision = ? AND json_type(data, '$.contacts') IS ${legacy ? "NOT " : ""}NULL`;
   const guard = {
     sql: `EXISTS (SELECT 1 FROM workspace WHERE ${condition})`,
     revision: current.revision,
   };
+  const companies = recordDiff(
+    "companies",
+    current.data.companies,
+    next.data.companies,
+  );
+  const contacts = recordDiff(
+    "contacts",
+    current.data.contacts,
+    next.data.contacts,
+  );
   const statements = [
-    ...upsertRecords(
-      "companies",
-      current.data.companies,
-      next.data.companies,
-      guard,
-    ),
-    ...removeRecords(
-      "contacts",
-      current.data.contacts,
-      next.data.contacts,
-      guard,
-    ),
-    ...upsertRecords(
-      "contacts",
-      current.data.contacts,
-      next.data.contacts,
-      guard,
-    ),
-    ...removeRecords(
-      "companies",
-      current.data.companies,
-      next.data.companies,
-      guard,
-    ),
+    ...upsertRecords("companies", companies.changed, guard),
+    ...removeRecords("contacts", contacts.removed, guard),
+    ...upsertRecords("contacts", contacts.changed, guard),
+    ...removeRecords("companies", companies.removed, guard),
   ];
+  // Track later changes for exactly the records covered by each audit entry.
+  const edited = [...contacts.edited, ...companies.edited];
+  if (edited.length) {
+    statements.push({
+      sql: `UPDATE mcp_log_details SET superseded = 1
+        WHERE superseded = 0 AND ${guard.sql} AND log_id IN (
+          SELECT records.log_id FROM json_each(?) AS edits
+          JOIN mcp_log_records AS records
+          ON records.kind = json_extract(edits.value, '$.kind')
+          AND records.record_id = json_extract(edits.value, '$.id')
+        )`,
+      args: [guard.revision, JSON.stringify(edited)],
+    });
+  }
+  if (undo) {
+    statements.push({
+      sql: `UPDATE mcp_log_details SET undone_revision = ? WHERE log_id = ? AND ${guard.sql}`,
+      args: [next.revision, undo, guard.revision],
+    });
+  }
   if (audit) {
     statements.push({
       sql: `INSERT INTO mcp_logs (tool, record_id, fields, revision)
@@ -212,6 +240,22 @@ export async function writeStoredWorkspace(
         guard.revision,
       ],
     });
+  }
+  if (audit?.changes) {
+    statements.push(
+      {
+        sql: `INSERT INTO mcp_log_details (log_id, changes)
+            SELECT last_insert_rowid(), ? WHERE ${guard.sql}`,
+        args: [JSON.stringify(audit.changes), guard.revision],
+      },
+      {
+        sql: `INSERT INTO mcp_log_records (log_id, kind, record_id)
+            SELECT details.log_id, json_extract(item.value, '$.kind'), json_extract(item.value, '$.recordId')
+            FROM mcp_log_details AS details, json_each(details.changes) AS item
+            WHERE details.log_id = last_insert_rowid() AND ${guard.sql}`,
+        args: [guard.revision],
+      },
+    );
   }
   // Evaluate every change against the same revision, then advance it last.
   statements.push({
@@ -282,4 +326,26 @@ export async function readMcpLogs(client, { limit, beforeId }) {
     .slice(0, limit)
     .map((row) => ({ ...row, fields: JSON.parse(row.fields) }));
   return { data, nextBeforeId: rows.length > limit ? data.at(-1).id : null };
+}
+
+export async function readMcpLogDetail(client, id) {
+  const { rows } = await client.execute({
+    sql: `SELECT log.id, log.created_at AS createdAt, log.tool, log.record_id AS recordId,
+          log.revision, log.fields, workspace.revision AS workspaceRevision, details.changes,
+          details.superseded, details.undone_revision AS undoneRevision
+          FROM mcp_logs AS log
+          JOIN workspace ON workspace.id = 1
+          LEFT JOIN mcp_log_details AS details ON details.log_id = log.id
+          WHERE log.id = ?`,
+    args: [id],
+  });
+  const row = rows[0];
+  return row
+    ? {
+        ...row,
+        fields: JSON.parse(row.fields),
+        superseded: Boolean(row.superseded),
+        changes: row.changes ? JSON.parse(row.changes) : null,
+      }
+    : null;
 }

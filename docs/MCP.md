@@ -84,7 +84,7 @@ If you supply the key as an environment variable instead of using a local `.env`
 node scripts/mcp-check.mjs https://crm.example.com/api/mcp
 ```
 
-The check should report `connected: true`, eleven tool names, and the `reach://usage` resource. The source in [scripts/mcp-check.mjs](../scripts/mcp-check.mjs) is also a working JavaScript SDK client example.
+The check should report `connected: true`, fourteen tool names, and the `reach://usage` resource. The source in [scripts/mcp-check.mjs](../scripts/mcp-check.mjs) is also a working JavaScript SDK client example.
 
 ## Tools
 
@@ -101,12 +101,17 @@ The check should report `connected: true`, eleven tool names, and the `reach://u
 | `update_company`       | `id`, `changes`, optional `expectedRevision`           | Patch supplied company fields.                                                     |
 | `log_contact_activity` | `contactId`, `activity`, optional `expectedRevision`   | Atomically append history and update the contact's status and relevant dates.      |
 | `list_mcp_logs`        | Optional `limit`, `beforeId`                            | Review successful MCP edits by tool, record ID, changed fields, and revision.      |
+| `find_contact_duplicates` | `email`, `linkedin`, or both | Find existing contacts by email or LinkedIn profile URL. |
+| `merge_contacts` | `keepId`, `mergeId`, `expectedRevision` | Combine notes and activity history, then remove the source contact. |
+| `get_mcp_log` | Audit entry `id` | Read saved before and after values for one edit. |
 
 List tools default to `limit: 50`, allow up to 100 results per page, and return `total`, `offset`, and `limit`. Request subsequent pages by increasing `offset`. `q` searches names, roles, niches, countries, descriptions, email, and LinkedIn as applicable; it does not search private notes or activities.
 
 Tool schemas describe accepted fields and enforce validation. See the [REST field reference](../README.md#json-api) for the full contact/company field lists. To link a contact, use the saved company ID returned by the CRM. For an independent contact, omit `companyId` or use an empty string or `null`. Leave out `id` on creation to generate a UUID. A supplied custom ID must be unique within its record type.
 
-The `mcp_logs` table keeps the latest 5,000 successful MCP edits. Each entry records the UTC timestamp, tool, record ID, changed field names, and workspace revision. Older entries are deleted automatically. To fetch the next page, pass the response's `nextBeforeId` as `beforeId`.
+Contact duplicates are checked on create and update. Confirm both IDs and the contact to keep before calling `merge_contacts`.
+
+The `mcp_logs` table keeps the latest 5,000 successful MCP edits. Each entry records the UTC timestamp, tool, record ID, changed field names, and workspace revision. New entries include saved before and after values. Use **MCP history** in the app to review and undo eligible edits. A later edit to an affected record makes undo unavailable. Older entries are deleted automatically. To fetch the next page, pass the response's `nextBeforeId` as `beforeId`.
 
 Statuses for both record types:
 
@@ -218,7 +223,7 @@ The dedicated key works with existing REST reads and writes as well as MCP. Brow
 
 ## Key access and deployment
 
-The key grants access to the whole personal workspace. MCP exposes no delete or bulk-replace tools, but the same key can use the existing REST delete and workspace-replace endpoints. This is one integration key, not per-agent permissions or a read-only scope. Share it only with a client you intend to grant that access to.
+The key grants access to the whole personal workspace. The same key can use the REST delete and workspace-replace endpoints. This is one integration key, not per-agent permissions or a read-only scope. Share it only with a client you intend to grant that access to.
 
 Rotate access by replacing `CRM_API_TOKEN` with a new random value in the server environment, restarting the app, and updating clients. The old token will stop working. This does not change the UI password or session secret.
 

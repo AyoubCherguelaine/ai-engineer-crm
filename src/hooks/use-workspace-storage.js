@@ -6,8 +6,8 @@ import { toast } from "sonner";
 
 const LEGACY_KEY = "reach-crm-v1";
 
-async function requestWorkspace(options) {
-  const response = await fetch("/api/workspace", {
+export async function requestCrm(path, options) {
+  const response = await fetch(path, {
     cache: "no-store",
     ...options,
   });
@@ -16,9 +16,15 @@ async function requestWorkspace(options) {
     throw Error("Your session expired. Sign in again.");
   }
   const body = await response.json();
-  if (!response.ok) throw Error(body.error || "Could not save to the server.");
+  if (!response.ok) {
+    const error = new Error(body.error || "Could not complete the request.");
+    error.status = response.status;
+    throw error;
+  }
   return body;
 }
+
+const requestWorkspace = (options) => requestCrm("/api/workspace", options);
 
 export function useWorkspaceStorage() {
   const [data, setViewData] = useState(null);
@@ -29,7 +35,8 @@ export function useWorkspaceStorage() {
   const dataRef = useRef(null),
     revision = useRef(0),
     queue = useRef(Promise.resolve()),
-    blocked = useRef(false);
+    blocked = useRef(false),
+    runningAction = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -84,6 +91,10 @@ export function useWorkspaceStorage() {
   }, []);
 
   const setData = useCallback((update) => {
+    if (runningAction.current) {
+      toast.error("Wait for the current workspace action to finish.");
+      return Promise.resolve();
+    }
     const next = normalizeClientWorkspace(
       typeof update === "function" ? update(dataRef.current) : update,
     );
@@ -114,9 +125,39 @@ export function useWorkspaceStorage() {
     return queue.current;
   }, []);
 
+  const runAction = useCallback(async (path, body, expected) => {
+    if (runningAction.current)
+      throw new Error("A workspace action is already running.");
+    runningAction.current = true;
+    setPending((count) => count + 1);
+    try {
+      await queue.current;
+      if (blocked.current)
+        throw new Error(
+          "Save a backup of your unsaved changes and reload before continuing.",
+        );
+      const workspace = await requestCrm(path, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "If-Match": String(expected ?? revision.current),
+        },
+        body: JSON.stringify(body),
+      });
+      revision.current = workspace.revision;
+      dataRef.current = normalizeClientWorkspace(workspace.data);
+      setViewData(dataRef.current);
+      return workspace;
+    } finally {
+      runningAction.current = false;
+      setPending((count) => count - 1);
+    }
+  }, []);
+
   return {
     data,
     setData,
+    runAction,
     ready: data !== null,
     saving: pending > 0,
     saveError,

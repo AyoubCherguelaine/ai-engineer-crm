@@ -8,6 +8,7 @@ import {
 } from "./workspace-storage.js";
 import { databaseConfig } from "./database-config.js";
 import { ApiError } from "./errors.js";
+import { newContactConflict } from "../lib/contact-matches.js";
 
 const connections = (globalThis.__reachLibsqlConnections ??= new Map());
 const conflict = () =>
@@ -86,16 +87,33 @@ export async function readWorkspace() {
   return readStoredWorkspace(await database());
 }
 
-export async function mutateWorkspace(transform, expectedRevision, audit) {
+export async function mutateWorkspace(
+  transform,
+  expectedRevision,
+  audit,
+  { allowedContactDuplicates, undo } = {},
+) {
   const client = await database();
   for (let attempt = 0; attempt < 8; attempt++) {
     const current = await readStoredWorkspace(client);
     if (expectedRevision !== undefined && expectedRevision !== current.revision)
       throw conflict();
     const data = normalizeWorkspace(transform(structuredClone(current.data)));
+    const duplicates = newContactConflict(
+      current.data.contacts,
+      data.contacts,
+      allowedContactDuplicates,
+    );
+    if (duplicates)
+      throw new ApiError(
+        409,
+        `Contacts share an email address or LinkedIn profile. Review or merge the existing contacts: ${duplicates.join(", ")}.`,
+      );
     const next = { data, revision: current.revision + 1, initialized: true };
     const change = audit?.(current.data, next.data);
-    if (await writeStoredWorkspace(client, current, next, { audit: change }))
+    if (
+      await writeStoredWorkspace(client, current, next, { audit: change, undo })
+    )
       return next;
     if (expectedRevision !== undefined) throw conflict();
   }

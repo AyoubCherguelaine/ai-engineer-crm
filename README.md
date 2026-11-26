@@ -126,6 +126,13 @@ Responses include the workspace revision. To guard an API mutation against concu
 
 The app uses `GET /api/workspace` for the full `{data, revision, initialized}` snapshot and `PUT /api/workspace` for validated backup replacement. PUT requires an `If-Match` revision and accepts the full workspace as its JSON body. `POST /api/auth/login` accepts `{username,password}` and sets an HttpOnly, SameSite session cookie. `POST /api/auth/logout` clears it.
 
+## Contact workflows
+
+- **Today** groups overdue follow-ups, follow-ups due today, and upcoming meetings. Snooze to tomorrow or log a message as sent to clear a follow-up.
+- **Contacts → Merge contacts** lets you choose which contact to keep. The app combines notes and activity history. Contact creation and edits check email and LinkedIn for duplicates, including MCP changes.
+- **Contacts → Import CSV** previews which rows will create or update contacts and which need fixes. Use headers such as `name,email,linkedin,role`. Blank cells preserve saved values on updates, and only valid rows are imported.
+- **MCP history** shows saved before and after values for recent MCP changes. Undo is available for edits with saved values when their affected records have had no later edits.
+
 ## Storage, migration, and backups
 
 New workspaces start with no contacts or companies. Historical demo records are removed from legacy browser data and imported backups, while personal records and profile details are preserved. To clean an older database explicitly, use `npm run db:remove-seed` for the configured database or `npm run db:remove-seed -- --local` for the local SQLite file. The cleanup backs up the workspace before changing it and matches only the known demo ID/name pairs.
